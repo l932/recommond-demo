@@ -1,12 +1,14 @@
 package org.leo.demo.recommend;
 
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Random;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -16,19 +18,22 @@ public class LFM {
     private double α = 0.02;// 梯度下降学习速率，步长
     private static final int F = 100;// 隐因子数
     private static final double λ = 0.01;// 正则化参数，防止过拟合
-    private static final int iterations = 50;// 迭代求解次数
+    private static final int iterations = 100;// 迭代求解次数
 
     private Map<Integer, Double[]> userF = Maps.newHashMap();// 用户-隐因子矩阵
     private Map<Integer, Double[]> itemF = Maps.newHashMap();// 物品-隐因子矩阵
 
     public static void main(String[] args) {
+        long start = System.currentTimeMillis();
         LFM lfm = new LFM();
         Map<Integer, Map<Integer, Double>> userItemRealData = lfm.buildInitData();
         lfm.initUserItemFactorMatrix(userItemRealData);
         lfm.train(userItemRealData);
         lfm.getRecommondItemByUserId(1, 10, userItemRealData);
-        lfm.getRecommondItemByUserId(2, 10, userItemRealData);
-        lfm.getRecommondItemByUserId(50, 10, userItemRealData);
+        // lfm.getRecommondItemByUserId(2, 10, userItemRealData);
+        // lfm.getRecommondItemByUserId(3, 10, userItemRealData);
+        long end = System.currentTimeMillis();
+        System.out.println("耗时" + (end - start) / 1000 + "秒");
     }
 
     /**
@@ -40,27 +45,33 @@ public class LFM {
      */
     public Map<Integer, Map<Integer, Double>> buildInitData() {
         Map<Integer, Map<Integer, Double>> userItemRealData = Maps.newHashMap();
-        Random rand = new Random();
-        for (int i = 0; i < 100; i++) {
-            int userId = i + 1;
-            for (int j = 0; j < 10; j++) {
-                int itemId = rand.nextInt(100) + 1;
-                Double rating = rand.nextDouble();
+        System.out.println("读取数据......");
+        String dataPath = "/Users/liupeng/git/repository/recommond-demo/recommond-demo/src/main/resources/ratings.csv";
+        BufferedReader br = null;
+        try {
+            br = new BufferedReader(new InputStreamReader(new FileInputStream(dataPath), "utf-8"));
+            String line = null;
+            Map<Integer, Double> itemRating = null;
+            while ((line = br.readLine()) != null) {
+                String[] dataRating = line.split(",");
+                Integer userID = Integer.valueOf(dataRating[0].trim());
+                Integer itemID = Integer.valueOf(dataRating[1].trim());
+                double rating = Double.parseDouble(dataRating[2]);
 
-                if (userItemRealData.containsKey(userId)) {
-                    if (userItemRealData.get(userId).containsKey(itemId)) {
-                        continue;
-                    }
-                    userItemRealData.get(userId).put(itemId, rating);
+                if (userItemRealData.containsKey(userID)) {
+                    itemRating = userItemRealData.get(userID);
+                    itemRating.put(itemID, rating);
                 } else {
-                    Map<Integer, Double> itemMap = new HashMap<Integer, Double>();
-                    itemMap.put(itemId, rating);
-                    userItemRealData.put(userId, itemMap);
+                    itemRating = Maps.newHashMap();
+                    itemRating.put(itemID, rating);
+                    userItemRealData.put(userID, itemRating);
                 }
-
             }
+            br.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(1);
         }
-
         return userItemRealData;
     }
 
@@ -96,6 +107,10 @@ public class LFM {
         }
     }
 
+    /**
+     * 训练
+     * @param userItemRealData
+     */
     public void train(Map<Integer, Map<Integer, Double>> userItemRealData) {
         for (int step = 0; step < LFM.iterations; step++) {
             System.out.println("第" + (step + 1) + "次迭代");
@@ -143,6 +158,13 @@ public class LFM {
         return predictRating;
     }
 
+    /**
+     * 获取用户TopN推荐
+     * @param userId
+     * @param count
+     * @param userItemRealData
+     * @return
+     */
     public List<Map.Entry<Integer, Double>> getRecommondItemByUserId(int userId, int count,
             Map<Integer, Map<Integer, Double>> userItemRealData) {
         Map<Integer, Double> result = Maps.newHashMap();
@@ -175,7 +197,9 @@ public class LFM {
         });
         List<Map.Entry<Integer, Double>> topN = list.subList(0, count);
         System.out.println("用户" + userId + "前" + count + "个推荐结果：");
-        System.out.println(topN);
+        for (Entry<Integer, Double> entry : topN) {
+            System.out.println(entry.getKey() + ":" + entry.getValue());
+        }
         return topN;
     }
 
